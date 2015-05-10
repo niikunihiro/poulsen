@@ -12,10 +12,10 @@ use PDOException;
 
 class ConnectorFactoryTest extends TestCase {
 
-    private $config = [
+    private $config = array(
         'default' => 'mysql',
-        'connections' => [
-            'mysql' => [
+        'connections' => array(
+            'mysql' => array(
                 'driver'    => 'mysql',
                 'host'      => 'localhost',
                 'database'  => 'niikunihiro',
@@ -25,9 +25,9 @@ class ConnectorFactoryTest extends TestCase {
                 'collation' => 'utf8_unicode_ci',
                 'prefix'    => '',
                 'strict'    => false,
-            ]
-        ]
-    ];
+            )
+        )
+    );
 
     /**
      * @test
@@ -53,10 +53,10 @@ class ConnectorFactoryTest extends TestCase {
     public function makeThrowPDOException()
     {
         $ConnectorFactory = new ConnectorFactory();
-        $properties = [
+        $properties = array(
             'config' => $this->config,
             'connection' => 'hoge',
-        ];
+        );
         $this->setPrivateProperties($ConnectorFactory, $properties);
         $ConnectorFactory->make();
     }
