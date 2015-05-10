@@ -35,10 +35,10 @@ class ConnectorFactoryTest extends TestCase {
     public function make()
     {
         $ConnectorFactory = new ConnectorFactory();
-        $properties = [
+        $properties = array(
             'config' => $this->config,
             'connection' => 'mysql',
-        ];
+        );
         $this->setPrivateProperties($ConnectorFactory, $properties);
 
         $actual = $ConnectorFactory->make();
