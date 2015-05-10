@@ -6,6 +6,7 @@
  */
 
 use ChromePhp;
+use Closure;
 use Exception;
 use PDOException;
 use Poulsen\Manager AS DB;
@@ -25,11 +26,9 @@ class Builder {
     /** @var string  */
     private $columns = '*';
     /** @var array  */
-    private $whereArr = array();
+    private $wheres = array();
     /** @var array  */
-    private $whereInArr = array();
-    /** @var array  */
-    private $whereRawArr = array();
+    private $bindings = array();
     /** @var array  */
     private $orderArr = array();
     /** @var integer|null  */
@@ -57,9 +56,21 @@ class Builder {
                 $this->table = $table;
             }
         } catch (PDOException $e) {
-            $this->logs[] = ['query' => $e->getMessage(), 'bindings' => []];
+            $this->logs[] = ['query' => $e->getMessage(), 'bindings' => array()];
             exit(mb_strimwidth($e->getMessage(), 0, 40, '...'));
         }
+    }
+
+    /**
+     * @param $name
+     * @return null|array
+     */
+    public function __get($name)
+    {
+        if (!in_array($name, array('wheres', 'bindings'), true)) {
+            return null;
+        }
+        return $this->{$name};
     }
 
     /**
@@ -79,9 +90,8 @@ class Builder {
     {
         $this->table       = '';
         $this->columns     = '*';
-        $this->whereArr    = array();
-        $this->whereInArr  = array();
-        $this->whereRawArr = array();
+        $this->wheres      = array();
+        $this->bindings    = array();
         $this->orderArr    = array();
         $this->take        = null;
         $this->skip        = null;
@@ -105,20 +115,50 @@ class Builder {
 
     /**
      * WHERE条件をセット
-     * @param array|string $terms ['カラム', '演算子', '値']の配列または引数3つ
+     * @param array|string $column ['カラム', '比較演算子', '値', '論理演算子']の配列または引数4つ
+     * @param null|string $operator
+     * @param null|string $value
+     * @param string $boolean
      * @return $this
      * @throws Exception
      */
-    public function where($terms)
+    public function where($column, $operator = null, $value = null, $boolean = 'AND')
     {
-        if (!is_array($terms)) {
-            if (func_num_args() !== 3) {
+        if ($column instanceof Closure)
+        {
+            return $this->whereNested($column, $boolean);
+        }
+
+        if (is_array($column)) {
+            // 配列の場合は要素が3または4
+            if (!in_array(count($column), array(3, 4), true)) {
                 throw new Exception('Invalid argument');
             }
-            $terms = func_get_args();
+            $fields = $column;
+
+            $column   = $fields[0];
+            $operator = $fields[1];
+            $value    = $fields[2];
+            // 要素数が3の場合は論理演算子を追加する
+            $boolean = (count($fields) === 3) ? $fields[3] : 'AND';
         }
-        $this->whereArr[] = $terms;
+
+        $this->wheres[]   = sprintf('%3$s %1$s %2$s ?', $column, $operator, $boolean);
+        $this->bindings[] = $value;
+
         return $this;
+    }
+
+    /**
+     * @param $column
+     * @param null $operator
+     * @param null $value
+     * @return Builder
+     * @throws Exception
+     */
+    public function orWhere($column, $operator = null, $value = null)
+    {
+        return $this->where($column, $operator, $value, 'OR');
     }
 
     /**
@@ -126,15 +166,28 @@ class Builder {
      * @param string $column
      * @param array $data
      * @param bool $not
+     * @param string $boolean
      * @return $this
-     * @throws \InvalidArgumentException
      */
-    public function whereIn($column, $data, $not = false)
+    public function whereIn($column, $data, $not = false, $boolean = 'AND')
     {
         if (!is_array($data)) {
             throw new \InvalidArgumentException('Invalid argument');
         }
-        $this->whereInArr[] = array('column' => $column, 'values' => $data, 'not' => $not);
+
+        $bindings = array();
+        $placeholderArr = array();
+        foreach ($data as $value) {
+            $bindings[]       = $value;
+            $placeholderArr[] = '?';
+        }
+
+        $format = ($not === true) ? '%3$s %1$s NOT IN(%2$s)' : '%3$s %1$s IN(%2$s)';
+        $placeholder = implode(', ', $placeholderArr);
+
+        $this->wheres[] = sprintf($format, $column, $placeholder, $boolean);
+        $this->bindings = array_merge($this->bindings, $bindings);
+
         return $this;
     }
 
@@ -142,23 +195,46 @@ class Builder {
      * NOT IN 条件をセット
      * @param string $column
      * @param array $data
+     * @param string $boolean
      * @return Builder
      * @throws Exception
      */
-    public function whereNotIn($column, $data)
+    public function whereNotIn($column, $data, $boolean = 'AND')
     {
-        return $this->whereIn($column, $data, true);
+        return $this->whereIn($column, $data, true, $boolean);
     }
 
     /**
      * 文字列で条件をセット（バインド等なし）
-     * @param $column
-     * @param $string
+     * @param string $column
+     * @param string $string
+     * @param string $boolean
      * @return $this
      */
-    public function whereRaw($column, $string)
+    public function whereRaw($column, $string, $boolean = 'AND')
     {
-        $this->whereRawArr[] = sprintf('%s %s', $column, $string);
+        $this->wheres[] = sprintf('%1$s %2$s %3$s', $boolean, $column, $string);
+
+        return $this;
+    }
+
+    /**
+     * @param Closure $callback
+     * @param string $boolean
+     * @return $this
+     */
+    public function whereNested($callback, $boolean = 'AND')
+    {
+        $Builder = new Builder($this->table, $this->DB);
+        call_user_func($callback, $Builder);
+
+        $wheres = implode(' ', $Builder->wheres);
+        $wheres = preg_replace('/\A(AND|OR) /i', '', $wheres);
+
+        $this->wheres[] = sprintf('%s (%s)', $boolean, $wheres);
+        $this->bindings = array_merge($this->bindings, $Builder->bindings);
+        unset($Builder);
+
         return $this;
     }
 
@@ -322,7 +398,7 @@ SQL;
         $this->reset();
 
         if (strpos($query, 'LIMIT 1') === false) {
-            $query .= PHP_EOL . 'LIMIT 1';
+            $query .= "\n" . 'LIMIT 1';
         }
 
         $this->logs[] = array('query' => $query, 'bindings' => $bindings);
@@ -391,8 +467,8 @@ SQL;
      */
     public function delete()
     {
-        if (empty($this->whereArr)) {
-            // whereArr句がない場合はエラー
+        if (empty($this->wheres)) {
+            // wheres句がない場合はエラー
             return false;
         }
 
@@ -431,7 +507,7 @@ SQL;
 
         if (!empty($this->join)) {
             array_map(function ($join) use (&$query) {
-                $query .= PHP_EOL . $join;
+                $query .= "\n" . $join;
             }, $this->join);
         }
 
@@ -448,15 +524,15 @@ SQL;
         list($query, $bindings) = $this->buildWhere($query);
 
         if (!empty($this->orderArr)) {
-            $query .= PHP_EOL . 'ORDER BY ' . implode(', ', $this->orderArr);
+            $query .= "\n" . 'ORDER BY ' . implode(', ', $this->orderArr);
         }
 
         if (!is_null($this->take)) {
-            $query .= PHP_EOL . 'LIMIT ' . $this->take;
+            $query .= "\n" . 'LIMIT ' . $this->take;
         }
 
         if (!is_null($this->skip)) {
-            $query .= PHP_EOL . 'OFFSET ' . $this->skip;
+            $query .= "\n" . 'OFFSET ' . $this->skip;
         }
 
         return array($query, $bindings);
@@ -471,42 +547,21 @@ SQL;
     {
         $bindings = array();
         $whereArr = array();
-        if (!empty($this->whereArr)) {
-            foreach ($this->whereArr as $where) {
-                $whereArr[] = sprintf(
-                    '%s %s ?',
-                    $where[0],
-                    $where[1]
-                );
-                $bindings[] = $where[2];
-            }
-        }
 
-        if (!empty($this->whereInArr)) {
-            foreach ($this->whereInArr as $where) {
-                $placeholderArr = array();
-                foreach ($where['values'] as $value) {
-                    $bindings[]       = $value;
-                    $placeholderArr[] = '?';
-                }
-
-                $format = ($where['not'] === true) ? '%s NOT IN(%s)' : '%s IN(%s)';
-                $placeholder = implode(', ', $placeholderArr);
-                $whereArr[]  = sprintf($format,
-                    $where['column'],
-                    $placeholder
-                );
-            }
-        }
-
-        if (!empty($this->whereRawArr)) {
-            foreach ($this->whereRawArr as $where) {
+        if (!empty($this->wheres)) {
+            foreach ($this->wheres as $where) {
                 $whereArr[] = $where;
             }
         }
 
+        if (!empty($this->bindings)) {
+            foreach ($this->bindings as $data) {
+                $bindings[] = $data;
+            }
+        }
+
         if (!empty($whereArr)) {
-            $query .= PHP_EOL . 'WHERE ' . implode(' AND ', $whereArr);
+            $query .= "\n" . 'WHERE 1 ' . implode(' ', $whereArr);
         }
 
         return array($query, $bindings);

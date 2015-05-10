@@ -77,9 +77,9 @@ class BuilderTest extends TestCase {
      * @expectedException Exception
      * @expectedExceptionMessage Invalid argument
      */
-    public function where引数が3つでないときに例外を投げる()
+    public function where引数が配列で要素が3つでないときに例外を投げる()
     {
-        $this->DB->where(1, 2);
+        $this->DB->where(array(1, 2));
     }
 
     /**
@@ -87,10 +87,12 @@ class BuilderTest extends TestCase {
      */
     public function whereWithArray()
     {
-        $arg = ['name', '=', 'niikunihiro'];
+        $arg = array('name', '=', 'niikunihiro', 'AND');
         $this->DB->where($arg);
-        $actual = $this->getPrivateProperty($this->DB, 'whereArr');
-        $this->assertEquals([$arg], $actual);
+        $actual = $this->getPrivateProperty($this->DB, 'wheres');
+        $this->assertEquals('AND name = ?', $actual[0]);
+        $actual = $this->getPrivateProperty($this->DB, 'bindings');
+        $this->assertEquals('niikunihiro', $actual[0]);
     }
 
     /**
@@ -98,10 +100,62 @@ class BuilderTest extends TestCase {
      */
     public function whereWith3Args()
     {
-        $arg = ['name', '=', 'niikunihiro'];
+        $arg = array('name', '=', 'niikunihiro');
         $this->DB->where($arg[0], $arg[1], $arg[2]);
-        $actual = $this->getPrivateProperty($this->DB, 'whereArr');
-        $this->assertEquals([$arg], $actual);
+        $actual = $this->getPrivateProperty($this->DB, 'wheres');
+        $this->assertEquals('AND name = ?', $actual[0]);
+        $actual = $this->getPrivateProperty($this->DB, 'bindings');
+        $this->assertEquals('niikunihiro', $actual[0]);
+    }
+
+    /**
+     * @test
+     */
+    public function whereWithClosure()
+    {
+        $this->DB->where('name', '<>', 'niikunihiro')->where(function($query)
+        {
+            $query->where('name', '=', 'poulsen');
+            $query->where('name', '=', 'nielsen', 'OR');
+        }, null, null, 'OR')
+        ->where('id', '<>', 2);
+
+        $actual = $this->DB->wheres;
+        $expected = array(
+            'AND name <> ?',
+            'OR (name = ? OR name = ?)',
+            'AND id <> ?',
+        );
+        $this->assertEquals($expected, $actual);
+
+        $actual = $this->DB->bindings;
+        $expected = array('niikunihiro', 'poulsen', 'nielsen', 2);
+        $this->assertEquals($expected, $actual);
+    }
+
+    /**
+     * @test
+     */
+    public function orWhereWithClosure()
+    {
+        $this->DB->where('name', '=', 'poulsen')
+        ->orWhere(function($query)
+        {
+            $query->whereIn('role_id', array(1, 2, 3));
+            $query->where('updated_at', '>', '2015-05-08 11:00:00');
+        })
+        ;
+
+        $actual = $this->DB->wheres;
+        $expected = array(
+            'AND name = ?',
+            'OR (role_id IN(?, ?, ?) AND updated_at > ?)',
+        );
+        $this->assertEquals($expected, $actual);
+
+        $actual = $this->DB->bindings;
+        $expected = array('poulsen', '1', '2', '3', '2015-05-08 11:00:00');
+        $this->assertEquals($expected, $actual);
     }
 
     /**
@@ -117,11 +171,11 @@ class BuilderTest extends TestCase {
     /**
      * @test
      */
-    public function whereIn第三引数のデフォルトがfalseになる()
+    public function whereInのデフォルト()
     {
-        $this->DB->whereIn('name', ['niikunihiro', 'nielsen', 'poulsen']);
-        $actual = $this->getPrivateProperty($this->DB, 'whereInArr');
-        $this->assertFalse($actual[0]['not']);
+        $this->DB->whereIn('name', array('niikunihiro', 'nielsen', 'poulsen'));
+        $actual = $this->getPrivateProperty($this->DB, 'wheres');
+        $this->assertSame('AND name IN(?, ?, ?)', $actual[0]);
     }
 
     /**
@@ -129,11 +183,16 @@ class BuilderTest extends TestCase {
      */
     public function whereIn複数条件を確認()
     {
-        $this->DB->whereIn('name', ['niikunihiro', 'nielsen', 'poulsen'], false);
-        $this->DB->whereIn('roles', ['super', 'admin'], true);
-        $actual = $this->getPrivateProperty($this->DB, 'whereInArr');
-        $this->assertEquals(['column' => 'name', 'values' => ['niikunihiro', 'nielsen', 'poulsen'], 'not' => false],  $actual[0]);
-        $this->assertEquals(['column' => 'roles', 'values' => ['super', 'admin'], 'not' => true], $actual[1]);
+        $this->DB->whereIn('name', array('niikunihiro', 'nielsen', 'poulsen'), false);
+        $this->DB->whereIn('roles', array('super', 'admin'), true, 'OR');
+        $expected_1st = 'AND name IN(?, ?, ?)';
+        $expected_2nd = 'OR roles NOT IN(?, ?)';
+        $actual = $this->getPrivateProperty($this->DB, 'wheres');
+        $this->assertEquals($expected_1st,  $actual[0]);
+        $this->assertEquals($expected_2nd, $actual[1]);
+
+        $actual = $this->getPrivateProperty($this->DB, 'bindings');
+        $this->assertEquals(array('niikunihiro', 'nielsen', 'poulsen', 'super', 'admin'),  $actual);
     }
 
     /**
@@ -141,9 +200,13 @@ class BuilderTest extends TestCase {
      */
     public function whereNotIn()
     {
-        $this->DB->whereNotIn('roles', ['super', 'admin']);
-        $actual = $this->getPrivateProperty($this->DB, 'whereInArr');
-        $this->assertEquals(['column' => 'roles', 'values' => ['super', 'admin'], 'not' => true], $actual[0]);
+        $this->DB->whereNotIn('roles', array('super', 'admin'));
+        $expected = 'AND roles NOT IN(?, ?)';
+        $actual = $this->getPrivateProperty($this->DB, 'wheres');
+        $this->assertEquals($expected, $actual[0]);
+
+        $actual = $this->getPrivateProperty($this->DB, 'bindings');
+        $this->assertEquals(array('super', 'admin'), $actual);
     }
 
     /**
@@ -152,8 +215,10 @@ class BuilderTest extends TestCase {
     public function whereRaw()
     {
         $this->DB->whereRaw('name', 'IS NULL');
-        $actual = $this->getPrivateProperty($this->DB, 'whereRawArr');
-        $this->assertEquals('name IS NULL', $actual[0]);
+        $actual = $this->getPrivateProperty($this->DB, 'wheres');
+
+        $this->assertEquals('AND name IS NULL', $actual[0]);
+
     }
 
     /**
@@ -250,7 +315,7 @@ class BuilderTest extends TestCase {
      */
     public function set引数が配列のとき()
     {
-        $data = ['name', 'nielsen'];
+        $data = array('name', 'nielsen');
         $this->DB->set($data);
         $actual = $this->getPrivateProperty($this->DB, 'setArr');
         $this->assertEquals($data, $actual[0]);
@@ -263,7 +328,7 @@ class BuilderTest extends TestCase {
     {
         $this->DB->set('name', 'nielsen');
         $actual = $this->getPrivateProperty($this->DB, 'setArr');
-        $this->assertEquals(['name', 'nielsen'], $actual[0]);
+        $this->assertEquals(array('name', 'nielsen'), $actual[0]);
     }
 
     /**
@@ -283,7 +348,7 @@ class BuilderTest extends TestCase {
     {
         $this->DB->values('name', 'poulsen');
         $actual = $this->getPrivateProperty($this->DB, 'values');
-        $this->assertEquals(['key' => 'name', 'value' => 'poulsen'], $actual[0]);
+        $this->assertEquals(array('key' => 'name', 'value' => 'poulsen'), $actual[0]);
     }
 
     /**
@@ -293,13 +358,13 @@ class BuilderTest extends TestCase {
     {
         $format = 'SELECT %s FROM tests';
         $this->DB->select('id', 'name')->where('name', '=', 'niikunihiro');
-        $actual = $this->callPrivateMethod($this->DB, 'buildSelect', [$format]);
+        $actual = $this->callPrivateMethod($this->DB, 'buildSelect', array($format));
         $expected =<<<SQL
 SELECT id, name FROM tests
-WHERE name = ?
+WHERE 1 AND name = ?
 SQL;
         $this->assertEquals($expected, $actual[0]);
-        $this->assertEquals(['niikunihiro'], $actual[1]);
+        $this->assertEquals(array('niikunihiro'), $actual[1]);
     }
 
     /**
@@ -308,18 +373,18 @@ SQL;
     public function buildSelectJoin()
     {
         $this->DB->select('id', 'name')
-            ->join('test_details', 'test_id', '=', 'id')
-            ->where('name', '=', 'niikunihiro')
+                 ->join('test_details', 'test_id', '=', 'id')
+                 ->where('name', '=', 'niikunihiro')
         ;
 
-        $actual = $this->callPrivateMethod($this->DB, 'buildSelect', ['SELECT %s FROM tests']);
+        $actual = $this->callPrivateMethod($this->DB, 'buildSelect', array('SELECT %s FROM tests'));
         $expected =<<<SQL
 SELECT id, name FROM tests
 INNER JOIN test_details ON test_details.test_id = tests.id
-WHERE name = ?
+WHERE 1 AND name = ?
 SQL;
         $this->assertEquals($expected, $actual[0]);
-        $this->assertEquals(['niikunihiro'], $actual[1]);
+        $this->assertEquals(array('niikunihiro'), $actual[1]);
     }
 
     /**
@@ -328,27 +393,27 @@ SQL;
     public function buildSelectAll()
     {
         $this->DB->select('id', 'name')
-            ->join('test_details', 'test_id', '=', 'id')
-            ->where('name', '=', 'niikunihiro')
-            ->whereIn('id', [1, 2, 3])
-            ->whereNotIn('id', [10])
-            ->whereRaw('name', 'IS NOT NULL')
-            ->orderBy('id', 'desc')
-            ->take(30)
-            ->skip(30)
+                 ->join('test_details', 'test_id', '=', 'id')
+                 ->where('name', '=', 'niikunihiro')
+                 ->whereIn('id', array(1, 2, 3))
+                 ->whereNotIn('id', array(10))
+                 ->whereRaw('name', 'IS NOT NULL')
+                 ->orderBy('id', 'desc')
+                 ->take(30)
+                 ->skip(30)
         ;
 
-        $actual = $this->callPrivateMethod($this->DB, 'buildSelect', ['SELECT %s FROM tests']);
+        $actual = $this->callPrivateMethod($this->DB, 'buildSelect', array('SELECT %s FROM tests'));
         $expected =<<<SQL
 SELECT id, name FROM tests
 INNER JOIN test_details ON test_details.test_id = tests.id
-WHERE name = ? AND id IN(?, ?, ?) AND id NOT IN(?) AND name IS NOT NULL
+WHERE 1 AND name = ? AND id IN(?, ?, ?) AND id NOT IN(?) AND name IS NOT NULL
 ORDER BY id DESC
 LIMIT 30
 OFFSET 30
 SQL;
         $this->assertEquals($expected, $actual[0]);
-        $this->assertEquals(['niikunihiro', '1', '2', '3', '10'], $actual[1]);
+        $this->assertEquals(array('niikunihiro', '1', '2', '3', '10'), $actual[1]);
     }
 
     /**
@@ -358,13 +423,13 @@ SQL;
     {
         $now = (new \DateTime)->format('Y-m-d H:i:s');
         $this->DB->set('name', 'poulsen')
-            ->set('updated_at', $now)
+                 ->set('updated_at', $now)
         ;
 
-        $actual = $this->callPrivateMethod($this->DB, 'buildSet', ['UPDATE tests']);
+        $actual = $this->callPrivateMethod($this->DB, 'buildSet', array('UPDATE tests'));
         $expected = 'UPDATE tests SET name = ?, updated_at = ?';
         $this->assertEquals($expected, $actual[0]);
-        $this->assertEquals(['poulsen', $now], $actual[1]);
+        $this->assertEquals(array('poulsen', $now), $actual[1]);
     }
 
     /**
@@ -392,32 +457,32 @@ SQL;
         $mock->shouldReceive('select');
         $this->DB = new Builder(null, $mock);
         $this->DB->table('tests')
-            ->select('id', 'name')
-            ->where('name', 'like', 'nielsen%')
-            ->whereIn('name', ['niikunihiro', 'poulsen'])
-            ->whereNotIn('id', ['1', '2'])
-            ->whereRaw('name', 'IS NOT NULL')
-            ->orderBy('id', 'DESC')
-            ->take(30)
-            ->skip(30)
-            ->get()
+                 ->select('id', 'name')
+                 ->where('name', 'like', 'nielsen%')
+                 ->whereIn('name', array('niikunihiro', 'poulsen'))
+                 ->whereNotIn('id', array('1', '2'))
+                 ->whereRaw('name', 'IS NOT NULL')
+                 ->orderBy('id', 'DESC')
+                 ->take(30)
+                 ->skip(30)
+                 ->get()
         ;
 
         $expected =<<<SQL
 SELECT id, name FROM tests
-WHERE name like ? AND name IN(?, ?) AND id NOT IN(?, ?) AND name IS NOT NULL
+WHERE 1 AND name like ? AND name IN(?, ?) AND id NOT IN(?, ?) AND name IS NOT NULL
 ORDER BY id DESC
 LIMIT 30
 OFFSET 30
 SQL;
         $this->assertEquals($expected, $this->DB->logs[0]['query']);
-        $expected = [
+        $expected = array(
             'nielsen%',
             'niikunihiro',
             'poulsen',
             '1',
             '2',
-        ];
+        );
         $this->assertEquals($expected, $this->DB->logs[0]['bindings']);
     }
 
@@ -430,8 +495,8 @@ SQL;
         $mock->shouldReceive('select');
         $this->DB = new Builder(null, $mock);
         $this->DB->table('tests')
-            ->join('samples', 'test_id', '=', 'id')
-            ->get();
+                 ->join('samples', 'test_id', '=', 'id')
+                 ->get();
 
         $expected =<<<SQL
 SELECT * FROM tests
@@ -466,11 +531,11 @@ SQL;
         $this->DB->table('tests')->where('id', '=', 1)->first();
         $expected =<<<SQL
 SELECT * FROM tests
-WHERE id = ?
+WHERE 1 AND id = ?
 LIMIT 1
 SQL;
         $this->assertEquals($expected, $this->DB->logs[0]['query']);
-        $this->assertEquals(['1'], $this->DB->logs[0]['bindings']);
+        $this->assertEquals(array('1'), $this->DB->logs[0]['bindings']);
     }
 
     /**
@@ -483,17 +548,17 @@ SQL;
         $mock->shouldReceive('insert');
         $this->DB = new Builder(null, $mock);
         $this->DB->table('tests')
-            ->values('name', 'poulsen')
-            ->values('created_at', $now)
-            ->values('updated_at', $now)
-            ->insert()
+                 ->values('name', 'poulsen')
+                 ->values('created_at', $now)
+                 ->values('updated_at', $now)
+                 ->insert()
         ;
 
         $expected =<<<SQL
 INSERT INTO tests (name, created_at, updated_at) VALUES (?, ?, ?)
 SQL;
         $this->assertEquals($expected, $this->DB->logs[0]['query']);
-        $this->assertEquals(['poulsen', $now, $now], $this->DB->logs[0]['bindings']);
+        $this->assertEquals(array('poulsen', $now, $now), $this->DB->logs[0]['bindings']);
     }
 
     /**
@@ -518,18 +583,18 @@ SQL;
         $mock->shouldReceive('update');
         $this->DB = new Builder(null, $mock);
         $this->DB->table('tests')
-            ->set('name', 'poulsen')
-            ->set('updated_at', $now)
-            ->where('id', '=', 2)
-            ->update()
+                 ->set('name', 'poulsen')
+                 ->set('updated_at', $now)
+                 ->where('id', '=', 2)
+                 ->update()
         ;
 
         $expected =<<<SQL
 UPDATE tests SET name = ?, updated_at = ?
-WHERE id = ?
+WHERE 1 AND id = ?
 SQL;
         $this->assertEquals($expected, $this->DB->logs[0]['query']);
-        $this->assertEquals(['poulsen', $now, '2'], $this->DB->logs[0]['bindings']);
+        $this->assertEquals(array('poulsen', $now, '2'), $this->DB->logs[0]['bindings']);
     }
 
     /**
@@ -553,16 +618,16 @@ SQL;
         $mock->shouldReceive('delete');
         $this->DB = new Builder(null, $mock);
         $this->DB->table('tests')
-            ->where('id', '=', 1)
-            ->delete()
+                 ->where('id', '=', 1)
+                 ->delete()
         ;
 
         $expected =<<<SQL
 DELETE FROM tests
-WHERE id = ?
+WHERE 1 AND id = ?
 SQL;
-        $this->assertEquals($expected, $this->DB->logs[0]['query']);
-        $this->assertEquals(['1'], $this->DB->logs[0]['bindings']);
+        $this->assertSame($expected, $this->DB->logs[0]['query']);
+        $this->assertEquals(array('1'), $this->DB->logs[0]['bindings']);
     }
 
     /**
@@ -574,29 +639,27 @@ SQL;
         $mock->shouldReceive('select');
         $this->DB = new Builder(null, $mock);
         $this->DB->table('tests')
-            ->join('samples', 'test_id', '=', 'id')
-            ->select('id', 'name')
-            ->where('name', 'like', 'nielsen%')
-            ->whereIn('name', ['niikunihiro', 'poulsen'])
-            ->whereNotIn('id', ['1', '2'])
-            ->whereRaw('name', 'IS NOT NULL')
-            ->orderBy('id', 'DESC')
-            ->take(30)
-            ->skip(30)
-            ->get()
+                 ->join('samples', 'test_id', '=', 'id')
+                 ->select('id', 'name')
+                 ->where('name', 'like', 'nielsen%')
+                 ->whereIn('name', array('niikunihiro', 'poulsen'))
+                 ->whereNotIn('id', array('1', '2'))
+                 ->whereRaw('name', 'IS NOT NULL')
+                 ->orderBy('id', 'DESC')
+                 ->take(30)
+                 ->skip(30)
+                 ->get()
         ;
 
         $this->assertEquals('', $this->getPrivateProperty($this->DB, 'table'));
         $this->assertEquals('*', $this->getPrivateProperty($this->DB, 'columns'));
-        $this->assertEquals([], $this->getPrivateProperty($this->DB, 'whereArr'));
-        $this->assertEquals([], $this->getPrivateProperty($this->DB, 'whereInArr'));
-        $this->assertEquals([], $this->getPrivateProperty($this->DB, 'whereRawArr'));
-        $this->assertEquals([], $this->getPrivateProperty($this->DB, 'orderArr'));
+        $this->assertEmpty($this->getPrivateProperty($this->DB, 'wheres'));
+        $this->assertEmpty($this->getPrivateProperty($this->DB, 'orderArr'));
         $this->assertNull($this->getPrivateProperty($this->DB, 'take'));
         $this->assertNull($this->getPrivateProperty($this->DB, 'skip'));
-        $this->assertEquals([], $this->getPrivateProperty($this->DB, 'setArr'));
-        $this->assertEquals([], $this->getPrivateProperty($this->DB, 'join'));
-        $this->assertEquals([], $this->getPrivateProperty($this->DB, 'values'));
+        $this->assertEmpty($this->getPrivateProperty($this->DB, 'setArr'));
+        $this->assertEmpty($this->getPrivateProperty($this->DB, 'join'));
+        $this->assertEmpty($this->getPrivateProperty($this->DB, 'values'));
     }
 
     /**
@@ -604,7 +667,7 @@ SQL;
      */
     public function chromePhp()
     {
-        $actual = $this->callPrivateMethod($this->DB, 'chromePhp', ['query' => '', 'bindings' => []]);
+        $actual = $this->callPrivateMethod($this->DB, 'chromePhp', array('query' => '', 'bindings' => array()));
         $this->assertNull($actual);
     }
 
@@ -617,5 +680,13 @@ SQL;
         $mock->shouldReceive('statement')->andReturn(0);
         $actual = Builder::statement('DROP TABLE tests', $mock);
         $this->assertSame(0, $actual);
+    }
+
+    /**
+     * @test
+     */
+    public function notExistPropertyReturnNull()
+    {
+        $this->assertNull($this->DB->hoge);
     }
 }
