@@ -169,7 +169,7 @@ class ManagerTest extends TestCase {
         $pdoStatementMock = m::mock('PDOStatement');
         $pdoStatementMock->shouldReceive('setFetchMode');
         $pdoStatementMock->shouldReceive('execute');
-        $pdoStatementMock->shouldReceive('fetchAll')->andReturn([]);
+        $pdoStatementMock->shouldReceive('fetchAll')->andReturn(array());
 
         $pdoMock = m::mock('PDO');
         $pdoMock->shouldReceive('prepare')->andReturn($pdoStatementMock);
