@@ -18,6 +18,9 @@ use Poulsen\Connectors\ConnectorFactory;
  */
 class Builder {
 
+    /** 環境 'production'の場合はログを出力しない */
+    const ENVIRON = 'production';
+
     /** @var string  */
     private $table = '';
 
@@ -603,6 +606,9 @@ SQL;
 
     public function __destruct()
     {
+        if (self::ENVIRON === 'production') {
+            return;
+        }
         array_map(array($this, 'chromePhp'), $this->logs);
     }
 }
