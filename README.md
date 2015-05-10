@@ -12,7 +12,13 @@ PHP 5.3 で動くクエリービルダー
 
 ## インストール
 
-Composer経由でインストール出来るようにする予定
+Composer経由でインストールします
+
+```composer.json
+{
+    "require": "niikunihiro/poulsen": "dev-master"
+}
+```
 
 ## 使い方
 
