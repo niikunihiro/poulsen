@@ -421,7 +421,8 @@ SQL;
      */
     public function buildSet()
     {
-        $now = (new \DateTime)->format('Y-m-d H:i:s');
+        $Dt = new \DateTime;
+        $now = $Dt->format('Y-m-d H:i:s');
         $this->DB->set('name', 'poulsen')
                  ->set('updated_at', $now)
         ;
@@ -543,7 +544,8 @@ SQL;
      */
     public function insert()
     {
-        $now = (new \DateTime)->format('Y-m-d H:i:s');
+        $Dt = new \DateTime;
+        $now = $Dt->format('Y-m-d H:i:s');
         $mock = m::mock('Poulsen\Manager');
         $mock->shouldReceive('insert');
         $this->DB = new Builder(null, $mock);
@@ -578,7 +580,8 @@ SQL;
      */
     public function updateTests()
     {
-        $now = (new \DateTime)->format('Y-m-d H:i:s');
+        $Dt = new \DateTime;
+        $now = $Dt->format('Y-m-d H:i:s');
         $mock = m::mock('Poulsen\Manager');
         $mock->shouldReceive('update');
         $this->DB = new Builder(null, $mock);

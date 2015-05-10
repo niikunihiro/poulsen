@@ -42,7 +42,7 @@ class Builder {
     /** @var array insert時に登録するデータのリスト */
     private $values = array();
     /** @var array  */
-    public $logs = [];
+    public $logs = array();
 
     /**
      * @param $table
@@ -56,7 +56,7 @@ class Builder {
                 $this->table = $table;
             }
         } catch (PDOException $e) {
-            $this->logs[] = ['query' => $e->getMessage(), 'bindings' => array()];
+            $this->logs[] = array('query' => $e->getMessage(), 'bindings' => array());
             exit(mb_strimwidth($e->getMessage(), 0, 40, '...'));
         }
     }
@@ -603,6 +603,6 @@ SQL;
 
     public function __destruct()
     {
-        array_map([$this, 'chromePhp'], $this->logs);
+        array_map(array($this, 'chromePhp'), $this->logs);
     }
 }
