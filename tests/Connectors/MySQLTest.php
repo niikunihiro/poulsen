@@ -17,7 +17,7 @@ use Mockery AS m;
  */
 class MySQLTest extends TestCase {
 
-    private $config = [
+    private $config = array(
         'driver'    => 'mysql',
         'host'      => 'localhost',
         'database'  => 'niikunihiro',
@@ -27,7 +27,7 @@ class MySQLTest extends TestCase {
         'collation' => 'utf8_unicode_ci',
         'prefix'    => '',
         'strict'    => false,
-    ];
+    );
 
     /**
      * @test

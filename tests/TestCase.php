@@ -49,7 +49,7 @@ class TestCase extends PHPUnit_Framework_TestCase {
      * @param array $args
      * @return mixed
      */
-    protected function callPrivateMethod($Instance, $method, $args = [])
+    protected function callPrivateMethod($Instance, $method, $args = array())
     {
         $reflectionClass = new ReflectionClass($Instance);
         $method = $reflectionClass->getMethod($method);

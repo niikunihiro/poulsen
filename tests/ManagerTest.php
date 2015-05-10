@@ -113,7 +113,7 @@ class ManagerTest extends TestCase {
         $factoryMock->shouldReceive('make')->andReturn($connectorInterfaceMock);
 
         $Manager = new Manager($factoryMock);
-        $actual = $Manager->insert('', []);
+        $actual = $Manager->insert('', array());
         $this->assertSame(10, $actual);
     }
 
@@ -135,7 +135,7 @@ class ManagerTest extends TestCase {
         $factoryMock->shouldReceive('make')->andReturn($connectorInterfaceMock);
 
         $Manager = new Manager($factoryMock);
-        $actual = $Manager->update('', []);
+        $actual = $Manager->update('', array());
         $this->assertTrue($actual);
     }
 
@@ -157,7 +157,7 @@ class ManagerTest extends TestCase {
         $factoryMock->shouldReceive('make')->andReturn($connectorInterfaceMock);
 
         $Manager = new Manager($factoryMock);
-        $actual = $Manager->delete('', []);
+        $actual = $Manager->delete('', array());
         $this->assertTrue($actual);
     }
 
@@ -181,8 +181,8 @@ class ManagerTest extends TestCase {
         $factoryMock->shouldReceive('make')->andReturn($connectorInterfaceMock);
 
         $Manager = new Manager($factoryMock);
-        $actual = $Manager->select('', []);
-        $this->assertEquals($actual, []);
+        $actual = $Manager->select('', array());
+        $this->assertEquals($actual, array());
     }
     /**
      * @test
@@ -205,7 +205,7 @@ class ManagerTest extends TestCase {
         $factoryMock->shouldReceive('make')->andReturn($connectorInterfaceMock);
 
         $Manager = new Manager($factoryMock);
-        $actual = $Manager->fetch('', []);
+        $actual = $Manager->fetch('', array());
         $this->assertEquals($actual, $obj);
     }
 }
