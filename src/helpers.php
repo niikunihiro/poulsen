@@ -23,3 +23,18 @@ if (!function_exists('array_pluck'))
         }, $array);
     }
 }
+
+if (!function_exists('with')) {
+    /**
+     * インスタンスを生成してチェーンでインスタンスメソッドを呼び出すときに使う
+     * PHPのバージョンが5.4以上だと標準でできるので、そちらを使う
+     * 例：
+     * with(new Class)->method()
+     * @param $object
+     * @return object
+     */
+    function with($object)
+    {
+        return $object;
+    }
+}
