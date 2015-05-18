@@ -205,3 +205,19 @@ $DB->table('users')
          ->where('id', '=', 32)
          ->delete();
 ```
+
+
+### クエリーログ
+
+クエリーログを確認するために、[ChromePhp](https://github.com/ccampbell/chromephp)を内部で使用しています。  
+
+ログの出力を停止する場合は、`Poulsen\Query\Builder`クラスのオブジェクト定数`ENVIRON`の値を`production`に設定します。
+
+```php
+namespace Poulsen\Query;
+
+class Builder {
+
+    /** 環境 'production'の場合はログを出力しない */
+    const ENVIRON = 'develop';
+```
