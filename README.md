@@ -110,6 +110,28 @@ $users = $DB->table('users')
     ->get();
 ```
 
+#### テーブル結合
+
+テーブル結合を行う場合は`join()`メソッドを使用します。  
+`join()`メソッドは第1引数に結合するテーブル名を指定します。第2引数から第4引数まではON句の条件を指定します。
+
+```php
+$comments = $DB->table('articles')
+            ->select('articles.title', 'comments.body AS comment')
+            ->join('comments', 'article_id', '=', 'id')
+            ->get();
+```
+
+外部結合を使いたい場合は`join()`メソッドの第5引数にLEFTまたはRIGHTを指定してください。
+
+```php
+$comments = $DB->table('articles')
+            ->select('articles.title', 'comments.body AS comment')
+            ->join('comments', 'article_id', '=', 'id', 'RIGHT')
+            ->get();
+```
+
+
 ### レコード挿入
 
 `values()`メソッドでデータを設定し、`insert()`メソッドでレコードを挿入します。  
