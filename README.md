@@ -110,6 +110,29 @@ $users = $DB->table('users')
     ->get();
 ```
 
+#### もうちょっと複雑な条件を指定する
+
+`where()`メソッドの引数に無名関数を渡すと括弧で囲んだ条件を作成する事が出来ます
+
+```php
+$user = $DB->table('users')
+    ->where('name', '=', 'poulsen')
+    ->orWhere(function($query)
+    {
+        $query->whereIn('role_id', array(1, 2, 3));
+        $query->where('updated_at', '>', '2015-05-08 11:00:00');
+    })
+    ->get();
+```
+
+上の例は次のSQLをビルドします
+
+```SQL
+SELECT * FROM users 
+WHERE 1 AND name = 'poulsen' 
+OR (role_id IN(1, 2, 3) AND updated_at > '2015-05-08 11:00:00')
+```
+
 #### テーブル結合
 
 テーブル結合を行う場合は`join()`メソッドを使用します。  
