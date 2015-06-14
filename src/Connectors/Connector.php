@@ -35,12 +35,12 @@ class Connector {
         $this->database  = $config['database'];
         $this->username  = $config['username'];
         $this->password  = $config['password'];
-        $this->charset   = $config['charset'];
-        $this->collation = $config['collation'];
-        $this->prefix    = $config['prefix'];
-        $this->strict    = $config['strict'];
-        if (isset($config['port'])) {
-            $this->port = (integer)$config['port'];
+
+        $options = array('charset', 'collation', 'prefix', 'strict', 'port');
+        foreach ($options as $option) {
+            if (array_key_exists($option, $config)) {
+                $this->$option = $config[$option];
+            }
         }
     }
 

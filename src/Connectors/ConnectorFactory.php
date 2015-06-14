@@ -19,10 +19,20 @@ class ConnectorFactory {
     /** @var array  */
     private $config;
 
+    /**
+     * @param null|string|array $connection
+     */
     public function __construct($connection = null)
     {
-        $this->config     = $this->config();
-        $this->connection = ($connection) ? : $this->config['default'];
+        if (is_array($connection)) {
+            // arrayのときは設定値が入っている。driverをconnectorにする
+            $this->config = $connection;
+            $this->connection = $connection['driver'];
+        } else {
+            $config = $this->config();
+            $this->connection = ($connection) ?: $config['default'];
+            $this->config = $config['connections'][$this->connection];
+        }
     }
 
     /**
@@ -33,7 +43,7 @@ class ConnectorFactory {
         switch ($this->connection)
         {
             case 'mysql':
-                return new MySQL($this->config['connections'][$this->connection]);
+                return new MySQL($this->config);
                 break;
             default:
                 throw new PDOException('no support');

@@ -32,11 +32,21 @@ class ConnectorFactoryTest extends TestCase {
     /**
      * @test
      */
+    public function initWithArray()
+    {
+        $ConnectorFactory = new ConnectorFactory($this->config['connections']['mysql']);
+        $actual = $ConnectorFactory->make();
+        $this->assertInstanceOf('Poulsen\Connectors\MySQL', $actual);
+    }
+
+    /**
+     * @test
+     */
     public function make()
     {
         $ConnectorFactory = new ConnectorFactory();
         $properties = array(
-            'config' => $this->config,
+            'config' => $this->config['connections']['mysql'],
             'connection' => 'mysql',
         );
         $this->setPrivateProperties($ConnectorFactory, $properties);
